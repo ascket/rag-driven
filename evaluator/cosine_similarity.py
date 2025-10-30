@@ -27,7 +27,7 @@ def calculate_cosine_similarity(text1: str, text2: str) -> int:
     return similarity[0][0]
 
 
-print(db_records)
+#print(db_records)
 
 #%%
 from generator import call_llm_with_full_text
@@ -43,7 +43,7 @@ print(calculate_cosine_similarity(" ".join(db_records), request_from_llm))
 
 import spacy
 import nltk
-nltk.download('wordnet')
+#nltk.download('wordnet')
 from nltk.corpus import wordnet
 from collections import Counter
 import numpy as np
@@ -154,8 +154,66 @@ print(f"Best match sentence: {best_matching_record}")
 
 
 #%%
-long_query = f"{query}: {best_matching_record}"
-print(call_llm_with_full_text(long_query))
+#Простой RAG
+augmented_input = f"{query}: {best_matching_record}"
+print(call_llm_with_full_text(augmented_input))
 
 #%%
-print(call_llm_with_full_text(query))
+#Продвинутый RAG: векторный поиск и поиск на основе индекса
+
+def find_best_match(text_input, records) -> tuple[int, str]:
+    """
+    Векторный поиск
+    Args:
+        text_input:
+        records:
+
+    Returns:
+
+    """
+    best_score = 0
+    best_record = None
+    for record in records:
+        current_score = calculate_cosine_similarity(text_input, record)
+        if current_score > best_score:
+            best_score = current_score
+            best_record = record
+    return best_score, best_record
+
+best_similarity_score, best_matching_record = find_best_match(query, db_records)
+
+print(query,": ", best_matching_record)
+similarity_score = calculate_enhanced_similarity(query, best_matching_record)
+print(f"Enhanced Similarity:, {similarity_score:.3f}")
+
+#%%
+augmented_input = f"{query}: {best_matching_record}"
+llm_response = call_llm_with_full_text(augmented_input)
+print(llm_response)
+
+
+#%%
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+def setup_vectorizer(records):
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(records)
+    return vectorizer, tfidf_matrix
+
+def find_best_match(query, vectorizer, tfidf_matrix):
+    query_tfidf = vectorizer.transform([query])
+    similarities = cosine_similarity(query_tfidf, tfidf_matrix)
+    best_index = similarities.argmax()  # Get the index of the highest similarity score
+    best_score = similarities[0, best_index]
+    return best_score, best_index
+
+vectorizer, tfidf_matrix = setup_vectorizer(db_records)
+
+best_similarity_score, best_index = find_best_match(query, vectorizer, tfidf_matrix)
+best_matching_record = db_records[best_index]
+
+print(query,": ", best_matching_record)
+similarity_score = calculate_enhanced_similarity(query, best_matching_record)
+print(f"Enhanced Similarity:, {similarity_score:.3f}")
